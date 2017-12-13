@@ -1,0 +1,113 @@
+<?php
+
+define('FIREBASE_MESSAGE_STATUS_NEW', 1);
+define('FIREBASE_MESSAGE_STATUS_UNREAD', 2);
+define('FIREBASE_MESSAGE_STATUS_READ', 3);
+
+// @TODO=========================
+//   Get rid of "cloud" in the code, Firebase don't use it, they just use
+//   messaging it'll save lots of code too.
+// @TODO=========================
+
+require_once('includes/cloud-messaging.inc');
+
+/**
+ * Implements hook_ctools_plugin_api().
+ */
+function firebase_ctools_plugin_api($owner, $api) {
+  if ($owner == 'services' && $api == 'services') {
+    return array(
+      'version' => 3,
+      'file' => 'firebase.services.inc'
+    );
+  }
+}
+
+/**
+ * Implements hook_permission()
+ */
+function firebase_permission() {
+  return array(
+    'administer firebase' => array(
+      'title' => t('Administer Firebase'),
+      'description' => t('Perform administration tasks for Firebase.'),
+    ),
+    'create fcm token' => array(
+      'title' => t('create Firebase Cloud Messaging token')
+    ),
+    'retrieve fcm token' => array(
+      'title' => t('retrieve own Firebase Cloud Messaging token')
+    ),
+    'update fcm token' => array(
+      'title' => t('update own Firebase Cloud Messaging token')
+    ),
+    'delete fcm token' => array(
+      'title' => t('delete own Firebase Cloud Messaging token')
+    ),
+  );
+}
+
+/**
+ * Implements hook_menu().
+ */
+function firebase_menu() {
+  $items = array();
+  $items['admin/config/services/firebase'] = array(
+    'title' => 'Firebase',
+    'description' => 'Configuration for the Firebase module',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('firebase_config_form'),
+    'access arguments' => array('administer firebase'),
+    'type' => MENU_NORMAL_ITEM,
+    'file' => 'forms/form.config.inc'
+  );
+  $items['admin/config/services/firebase/cloud-messaging/send'] = array(
+    'title' => 'Firebase Cloud Messaging Send',
+    'description' => 'Send a message with Firebase Cloud Messaging',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('firebase_cloud_messaging_send_form'),
+    'access arguments' => array('administer firebase'),
+    'type' => MENU_NORMAL_ITEM,
+    'file' => 'forms/form.cloud-messaging-send.inc'
+  );
+  return $items;
+}
+
+/**
+ * HELPERS
+ */
+
+/**
+ * Returns a count of messages, grouped by message status for a particular user.
+ * If no status is passed in, an array will be returned keyed by the status id
+ * and the count as the value. If a status is passed in, that count will be
+ * returned. If no user id is passed in, it'll default to the current user.
+ * @param null $status
+ * @param null $uid
+ * @return array
+ */
+function firebase_message_status_count($status = NULL, $uid = NULL) {
+  if (!$uid) { $uid = $GLOBALS['user']->uid; }
+
+  $query = db_select('firebase_cloud_messaging_messages', 'm')
+    ->fields('m', array('status'))
+    ->condition('m.uid', $uid);
+
+  if ($status) {
+    $query->condition('m.status', $status);
+  }
+
+  $query->groupBy('m.status');
+  $query->addExpression('COUNT(m.mid)', 'msgCount');
+
+  $results = $query->execute();
+  if (!$status) {
+    $rows = array();
+    while ($row = $results->fetchObject()) {
+      $rows[$row->status] = $row->msgCount;
+    }
+    return $rows;
+  }
+  $row = $results->fetchObject();
+  return $row->msgCount;
+}

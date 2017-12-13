@@ -1,0 +1,6 @@
+name = Firebase
+description = "Firebase module for Drupal 7."
+package = Services
+core = 7.x
+configure = admin/config/services/firebase
+dependencies[] = services

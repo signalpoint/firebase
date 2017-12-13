@@ -1,0 +1,124 @@
+<?php
+
+function firebase_uninstall() {
+
+  // Delete all of our variables.
+  $vars = array(
+    'firebase_cloud_messaging_server_key',
+    'firebase_cloud_messaging_sender_id'
+  );
+  foreach ($vars as $name) { variable_del($name); }
+
+}
+
+/**
+ * Implements hook_field_scheme().
+ */
+function firebase_schema() {
+  $schema = array();
+
+  $schema['firebase_cloud_messaging_tokens'] = array(
+    'description' => 'Holds onto Firebase Cloud Messaging tokens.',
+    'fields' => array(
+      'id' => array(
+        'description' => t('An internal id for the token.'),
+        'type' => 'serial',
+        'not null' => TRUE,
+      ),
+      'token' => array(
+        'description' => 'The token.',
+        'type' => 'varchar',
+        'length' => '255',
+        'not null' => TRUE,
+      ),
+      'uid' => array(
+        'description' => 'User ID.',
+        'type' => 'int',
+        'not null' => TRUE,
+      ),
+      'platform' => array(
+        'description' => 'Device platform: web, android, ios, etc',
+        'type' => 'varchar',
+        'length' => 12,
+        'not null' => TRUE,
+      ),
+      'created' => array(
+        'description' => 'Date and time token was created.',
+        'type' => 'int',
+        'not null' => TRUE,
+      ),
+      'language' => array(
+        'description' => "The user's language code.",
+        'type' => 'varchar',
+        'length' => 12,
+        'not null' => TRUE,
+      ),
+    ),
+    'primary key' => array('id')
+  );
+
+  $schema['firebase_cloud_messaging_multicast'] = array(
+    'description' => 'Holds onto Firebase Cloud Messaging multicast data.',
+    'fields' => array(
+      'mcid' => array(
+        'description' => t('An internal id for the multicast.'),
+        'type' => 'serial',
+        'not null' => TRUE,
+      ),
+      'multicast_id' => array(
+        'description' => 'The multicast_id from Firebase.',
+        'type' => 'varchar',
+        'length' => '255',
+        'not null' => TRUE,
+      ),
+      'created' => array(
+        'description' => 'Date and time the multicast was created.',
+        'type' => 'int',
+        'not null' => TRUE,
+      ),
+      'notification' => array(
+        'description' => 'The serialized notification data sent to Firebase.',
+        'type' => 'text',
+        'size' => 'big',
+        'not null' => TRUE,
+      )
+    ),
+    'primary key' => array('mcid')
+  );
+
+  $schema['firebase_cloud_messaging_messages'] = array(
+    'description' => 'Holds onto Firebase Cloud Messaging messages',
+    'fields' => array(
+      'mid' => array(
+        'description' => t('An internal id for the message.'),
+        'type' => 'serial',
+        'not null' => TRUE,
+      ),
+      'mcid' => array(
+        'description' => 'The id for the Firebase multicast_id.',
+        'type' => 'varchar',
+        'length' => '255',
+        'not null' => TRUE,
+      ),
+      'uid' => array(
+        'description' => 'The recipient User ID.',
+        'type' => 'int',
+        'not null' => TRUE,
+      ),
+      'status' => array(
+        'description' => 'The message status, unread, read, etc.',
+        'type' => 'varchar',
+        'length' => 12,
+        'not null' => TRUE,
+      ),
+      'changed' => array(
+        'description' => 'Date and time message was updated.',
+        'type' => 'int',
+        'not null' => TRUE,
+      )
+    ),
+    'primary key' => array('mid')
+  );
+
+  return $schema;
+}
