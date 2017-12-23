@@ -207,7 +207,7 @@ function firebase_services_resources() {
           'file' => array(
             'type' => 'inc',
             'module' => 'firebase',
-            'name' => 'resources/resource.message-search'
+            'name' => 'resources/resource.cloud-messaging'
           ),
           'callback' => '_fcm_message_search',
           'args' => array(
