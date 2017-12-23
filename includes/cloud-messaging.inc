@@ -101,13 +101,32 @@ function fcm_multicast_save(&$data) {
 
 function fcm_message_search($data) {
 
-  // fields
-  // conditions
-  // orderBy
-  // groupBy
-  // limit
-  // page
+  global $user;
+  $uid = $user->uid;
 
-  return $data;
+  // Check for any 'limit' on the query range.
+  $max = 100;
+  $limit = isset($data['limit']) ? $data['limit'] : $max;
+  if ($limit > $max) { $limit = $max; }
+
+  $query = db_select('firebase_cloud_messaging_messages', 'messages');
+  $query->join('firebase_cloud_messaging_multicast', 'multicast', 'messages.mcid = multicast.mcid');
+  $query->fields('messages', array('mid', 'status'));
+  $query->fields('multicast', array('mcid', 'notification', 'created'));
+  $query->condition('messages.uid', $uid);
+  $query->orderBy('multicast.created', 'DESC');
+  $query->range(0, $limit);
+
+  $results = $query->execute();
+  $rows = array();
+  while ($row = $results->fetchObject()) {
+    $row->notification = unserialize($row->notification);
+    $row->mid = (int) $row->mid;
+    $row->mcid = (int) $row->mcid;
+    $row->created = (int) $row->created;
+    $row->status = (int) $row->status;
+    $rows[] = $row;
+  }
+  return !empty($rows) ? $rows : NULL;
 
 }
