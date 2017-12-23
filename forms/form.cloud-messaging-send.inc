@@ -190,7 +190,7 @@ function firebase_cloud_messaging_send_form_submit($form, &$form_state) {
 
     // Insert a message record for each recipient user id. The record will
     // reference the multicast id where the notification data is actually saved,
-    // here we just care about tracking the status of the message: unread,
+    // here we just care about tracking the status of the message: new, unread,
     // read, archived, etc.
     if ($multicast && isset($multicast->mcid) && !empty($recipientUserIds)) {
       $now = time();
