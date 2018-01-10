@@ -111,3 +111,11 @@ function firebase_message_status_count($status = NULL, $uid = NULL) {
   $row = $results->fetchObject();
   return $row->msgCount;
 }
+
+function firebase_message_status_valid($status) {
+  return in_array($status, [
+    FIREBASE_MESSAGE_STATUS_NEW,
+    FIREBASE_MESSAGE_STATUS_UNREAD,
+    FIREBASE_MESSAGE_STATUS_READ
+  ]);
+}
