@@ -27,6 +27,28 @@ function _fcm_token_delete($id) {
  * MESSAGES
  */
 
+// PROXIES
+
+function _fcm_message_update($mid, $data) {
+  $data = (object) $data;
+  if (!isset($data->mid)) { $data->mid = $mid; }
+  return fcm_message_save($data);
+}
+
 function _fcm_message_search($data) {
   return fcm_message_search($data);
+}
+
+function _fcm_message_bulk($data) {
+  return fcm_message_bulk($data);
+}
+
+// HELPERS
+
+function fcm_message_load($mid) {
+  $query = db_select('firebase_cloud_messaging_messages', 'messages')
+    ->fields('messages')
+    ->condition('messages.mid', $mid)
+    ->execute();
+  return $query->fetchObject();
 }
