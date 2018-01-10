@@ -91,6 +91,8 @@ function fcm_multicast_save(&$data) {
     }
   }
 
+  // @TODO this isn't ready for use with updating a record, need to add the
+  // third parameter.
   return drupal_write_record('firebase_cloud_messaging_multicast', $data) ?
     $data : NULL;
 }
@@ -98,6 +100,18 @@ function fcm_multicast_save(&$data) {
 /**
  * MESSAGES
  */
+
+function fcm_message_save($data) {
+  $new = !isset($data->mid);
+  if ($new) {
+    return drupal_write_record('firebase_cloud_messaging_messages', $data) ?
+      $data : NULL;
+  }
+  else {
+    return drupal_write_record('firebase_cloud_messaging_messages', $data, 'mid') ?
+      $data : NULL;
+  }
+}
 
 function fcm_message_search($data) {
 
@@ -128,5 +142,33 @@ function fcm_message_search($data) {
     $rows[] = $row;
   }
   return !empty($rows) ? $rows : NULL;
+
+}
+
+function fcm_message_bulk($data) {
+
+  switch ($data['op']) {
+
+    case 'updateStatus':
+
+      // Validate the message type.
+      if (!firebase_message_status_valid($data['mid'])) {
+        watchdog('firebase', t('Invalid message status @status.', array('@status' => $data['status'])));
+        return FALSE;
+      }
+
+      // Update the message(s) type.
+      db_update('firebase_cloud_messaging_messages')
+        ->fields(array('status' => $data['status']))
+        ->condition('mid', $data['mid'], 'IN')
+        ->execute();
+
+      return TRUE;
+
+      break;
+
+  }
+
+  return FALSE;
 
 }
