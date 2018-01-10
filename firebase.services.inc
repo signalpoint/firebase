@@ -50,7 +50,7 @@ function firebase_services_resources() {
         'access callback file' => array(
           'type' => 'inc',
           'module' => 'firebase',
-          'name' => 'resources/access',
+          'name' => 'firebase.resource',
         ),
         'access arguments' => array('retrieve fcm token'),
         'access arguments append' => TRUE,
@@ -83,7 +83,7 @@ function firebase_services_resources() {
         'access callback file' => array(
           'type' => 'inc',
           'module' => 'firebase',
-          'name' => 'resources/access',
+          'name' => 'firebase.resource',
         ),
         'access arguments' => array('update fcm token'),
         'access arguments append' => TRUE,
@@ -109,7 +109,7 @@ function firebase_services_resources() {
         'access callback file' => array(
           'type' => 'inc',
           'module' => 'firebase',
-          'name' => 'resources/access',
+          'name' => 'firebase.resource',
         ),
         'access arguments' => array('delete fcm token'),
         'access arguments append' => TRUE,
@@ -137,7 +137,7 @@ function firebase_services_resources() {
         'access callback file' => array(
           'type' => 'inc',
           'module' => 'firebase',
-          'name' => 'resources/access',
+          'name' => 'firebase.resource',
         ),
         'access arguments' => array('retrieve fcm message'),
         'access arguments append' => TRUE,
@@ -170,7 +170,7 @@ function firebase_services_resources() {
         'access callback file' => array(
           'type' => 'inc',
           'module' => 'firebase',
-          'name' => 'resources/access',
+          'name' => 'firebase.resource',
         ),
         'access arguments' => array('update fcm message'),
         'access arguments append' => TRUE,
@@ -196,7 +196,7 @@ function firebase_services_resources() {
         'access callback file' => array(
           'type' => 'inc',
           'module' => 'firebase',
-          'name' => 'resources/access',
+          'name' => 'firebase.resource',
         ),
         'access arguments' => array('delete fcm message'),
         'access arguments append' => TRUE,
@@ -219,13 +219,39 @@ function firebase_services_resources() {
               'optional' => FALSE
             )
           ),
-          'access callback' => '_crimewatch_directory_resource_access',
+          'access callback' => '_firebase_resource_access',
           'access callback file' => array(
             'type' => 'inc',
-            'module' => 'crimewatch_directory',
-            'name' => 'resources/access'
+            'module' => 'firebase',
+            'name' => 'firebase.resource'
           ),
           'access arguments' => array('message search'),
+          'access arguments append' => TRUE
+        ),
+        'bulk' => array(
+          'help' => t('Bulk operations for messages.'),
+          'file' => array(
+            'type' => 'inc',
+            'module' => 'firebase',
+            'name' => 'resources/resource.cloud-messaging'
+          ),
+          'callback' => '_fcm_message_bulk',
+          'args' => array(
+            array(
+              'name' => 'data',
+              'type' => 'struct',
+              'description' => t('The bulk data operations.'),
+              'source' => 'data',
+              'optional' => FALSE
+            )
+          ),
+          'access callback' => '_firebase_resource_access',
+          'access callback file' => array(
+            'type' => 'inc',
+            'module' => 'firebase',
+            'name' => 'firebase.resource'
+          ),
+          'access arguments' => array('message bulk'),
           'access arguments append' => TRUE
         )
       )
