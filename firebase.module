@@ -113,9 +113,9 @@ function firebase_message_status_count($status = NULL, $uid = NULL) {
 }
 
 function firebase_message_status_valid($status) {
-  return in_array($status, [
+  return in_array($status, array(
     FIREBASE_MESSAGE_STATUS_NEW,
     FIREBASE_MESSAGE_STATUS_UNREAD,
     FIREBASE_MESSAGE_STATUS_READ
-  ]);
+  ));
 }
