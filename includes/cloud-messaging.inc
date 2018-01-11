@@ -101,6 +101,138 @@ function fcm_multicast_save(&$data) {
  * MESSAGES
  */
 
+function fcm_message_send($msg, $userTokens) {
+
+  // Put together a collection of internal token ids and actual Firebase tokens.
+  $tokenIds = [];
+  $tokens = [];
+  foreach ($userTokens as $tokenId => $tokenData) {
+    $tokenIds[] = $tokenData->id;
+    $tokens[] = $tokenData->token;
+  }
+//  dpm($tokenIds);
+//  dpm($tokens);
+
+  // Set up the fields to POST.
+  $fields = array(
+    'registration_ids' => $tokens,
+    'notification' => $msg
+  );
+
+  // Set up the headers.
+  $headers = array(
+    'Authorization: key=' . variable_get('firebase_cloud_messaging_server_key'),
+    'Content-Type: application/json'
+  );
+
+  // Send everything to Firebase via CURL.
+  $ch = curl_init();
+  curl_setopt($ch, CURLOPT_URL, 'https://fcm.googleapis.com/fcm/send');
+  curl_setopt($ch, CURLOPT_POST, true);
+  curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+  curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+  curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+  curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($fields));
+  $response = json_decode(curl_exec($ch));
+  curl_close($ch);
+//  dpm($response);
+
+  if ($response->success) {
+    drupal_set_message(t('Successfully sent @count @plural.', array(
+      '@count' => $response->success,
+      '@plural' => format_plural($response->success, t('message'), t('messages'))
+    )));
+  }
+
+  if ($response->failure) {
+    drupal_set_message(t('Failed to send @count @plural.', array(
+      '@count' => $response->success,
+      '@plural' => format_plural($response->success, t('message'), t('messages'))
+    )), 'warning');
+  }
+
+  if (isset($response->results) && is_array($response->results) && sizeof($response->results)) {
+
+    // @TODO watch out for errors here
+
+    // Save the multicast and the notification data if there was at least one
+    // successful delivery.
+    $multicast = NULL;
+    if ($response->success) {
+      $multicast = new stdClass();
+      $multicast->multicast_id = $response->multicast_id;
+      $multicast->notification = $msg;
+      fcm_multicast_save($multicast);
+    }
+
+    // Prepare to track the user ids of all the successful message recipients,
+    // we'll need these ids to relate their messages to the DB later.
+    $recipientUserIds = array();
+
+    // Now process each message result...
+    foreach ($response->results as $delta => $result) {
+
+      // Grab our internal token id.
+      $tokenId = $tokenIds[$delta];
+
+      // Check for errors.
+      if (isset($result->error)) {
+
+        // Delete tokens that are no longer registered.
+        if ($result->error == 'NotRegistered') {
+          fcm_token_delete($tokenId);
+        }
+
+        continue; // Skip this token, there was an error.
+      }
+
+      // There were no errors with this message...
+
+      if (isset($result->message_id)) {
+
+        // Example message id: 0:1234567890%abcdefg
+
+        $tokenData = $userTokens[$tokenId];
+        $recipientUid = $tokenData->uid;
+
+        // Mark this user id as a recipient, if it hasn't been already.
+        if (!in_array($recipientUid, $recipientUserIds)) {
+          $recipientUserIds[] = $recipientUid;
+        }
+
+      }
+
+    }
+
+    // We've gone over each message and have what we need to proceed...
+
+    // Insert a message record for each recipient user id. The record will
+    // reference the multicast id where the notification data is actually saved,
+    // here we just care about tracking the status of the message: new, unread,
+    // read, archived, etc.
+    if ($multicast && isset($multicast->mcid) && !empty($recipientUserIds)) {
+      $now = time();
+
+      $query = db_insert('firebase_cloud_messaging_messages')->fields(
+        array('mcid', 'uid', 'status', 'changed')
+      );
+      foreach ($recipientUserIds as $uid) {
+        $query->values(array(
+          'mcid' => $multicast->mcid,
+          'uid' => $uid,
+          'status' => FIREBASE_MESSAGE_STATUS_NEW,
+          'changed' => $now
+        ));
+      }
+      $query->execute();
+    }
+
+  }
+
+  return $response;
+
+}
+
 function fcm_message_save($data) {
   $new = !isset($data->mid);
   if ($new) {
@@ -152,7 +284,7 @@ function fcm_message_bulk($data) {
     case 'updateStatus':
 
       // Validate the message type.
-      if (!firebase_message_status_valid($data['mid'])) {
+      if (!firebase_message_status_valid($data['status'])) {
         watchdog('firebase', t('Invalid message status @status.', array('@status' => $data['status'])));
         return FALSE;
       }
