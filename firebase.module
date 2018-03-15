@@ -109,7 +109,7 @@ function firebase_message_status_count($status = NULL, $uid = NULL) {
     return $rows;
   }
   $row = $results->fetchObject();
-  return $row->msgCount;
+  return $row ? $row->msgCount : 0;
 }
 
 function firebase_message_status_valid($status) {
