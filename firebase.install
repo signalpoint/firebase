@@ -63,24 +63,30 @@ function firebase_schema() {
       'mcid' => array(
         'description' => t('An internal id for the multicast.'),
         'type' => 'serial',
-        'not null' => TRUE,
+        'not null' => TRUE
       ),
       'multicast_id' => array(
         'description' => 'The multicast_id from Firebase.',
         'type' => 'varchar',
         'length' => '255',
-        'not null' => TRUE,
+        'not null' => TRUE
       ),
       'created' => array(
         'description' => 'Date and time the multicast was created.',
         'type' => 'int',
-        'not null' => TRUE,
+        'not null' => TRUE
       ),
       'notification' => array(
-        'description' => 'The serialized notification data sent to Firebase.',
+        'description' => 'The serialized notification sent to Firebase.',
         'type' => 'text',
         'size' => 'big',
-        'not null' => TRUE,
+        'not null' => TRUE
+      ),
+      'data' => array(
+        'description' => 'The serialized data payload sent to Firebase, if any.',
+        'type' => 'text',
+        'size' => 'big',
+        'not null' => FALSE
       )
     ),
     'primary key' => array('mcid')
