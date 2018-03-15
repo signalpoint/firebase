@@ -70,9 +70,14 @@ function fcm_multicast_save(&$data) {
   // Set any missing defaults.
   if (!isset($data->created)) { $data->created = time(); }
 
-  // Serialize it.
+  // Serialize the notification it.
   if (isset($data->notification) && !is_string($data->notification)) {
     $data->notification = serialize($data->notification);
+  }
+
+  // Serialize the data payload if any.
+  if (isset($data->data) && !is_string($data->data)) {
+    $data->data = serialize($data->data);
   }
 
   // Don't let the same multicast be saved twice, instead just load and return
@@ -93,15 +98,14 @@ function fcm_multicast_save(&$data) {
 
   // @TODO this isn't ready for use with updating a record, need to add the
   // third parameter.
-  return drupal_write_record('firebase_cloud_messaging_multicast', $data) ?
-    $data : NULL;
+  return drupal_write_record('firebase_cloud_messaging_multicast', $data) ? $data : NULL;
 }
 
 /**
  * MESSAGES
  */
 
-function fcm_message_send($msg, $userTokens) {
+function fcm_message_send($notification, $userTokens, $data = array()) {
 
   // Put together a collection of internal token ids and actual Firebase tokens.
   $tokenIds = [];
@@ -113,15 +117,25 @@ function fcm_message_send($msg, $userTokens) {
 //  dpm($tokenIds);
 //  dpm($tokens);
 
+  // Any extra data?
+  $hasData = !empty($data);
+
   // Set up the fields to POST.
   $fields = array(
     'registration_ids' => $tokens,
-    'notification' => $msg
+    'notification' => $notification
   );
+  if ($hasData) { $fields['data'] = $data; }
+
+  $serverKey = variable_get('firebase_cloud_messaging_server_key', '');
+  if ($serverKey == '') {
+    drupal_set_message(t('Firebase "Server key" has not been set.'), 'warning');
+    return NULL;
+  }
 
   // Set up the headers.
   $headers = array(
-    'Authorization: key=' . variable_get('firebase_cloud_messaging_server_key'),
+    'Authorization: key=' . $serverKey,
     'Content-Type: application/json'
   );
 
@@ -137,31 +151,20 @@ function fcm_message_send($msg, $userTokens) {
   curl_close($ch);
 //  dpm($response);
 
-  if ($response->success) {
-    drupal_set_message(t('Successfully sent @count @plural.', array(
-      '@count' => $response->success,
-      '@plural' => format_plural($response->success, t('message'), t('messages'))
-    )));
-  }
-
-  if ($response->failure) {
-    drupal_set_message(t('Failed to send @count @plural.', array(
-      '@count' => $response->success,
-      '@plural' => format_plural($response->success, t('message'), t('messages'))
-    )), 'warning');
-  }
-
+  // If we have a response with success and results, assemble our multicast from
+  // the FCM response.
+  $multicast = NULL;
   if (isset($response->results) && is_array($response->results) && sizeof($response->results)) {
 
     // @TODO watch out for errors here
 
     // Save the multicast and the notification data if there was at least one
     // successful delivery.
-    $multicast = NULL;
     if ($response->success) {
       $multicast = new stdClass();
       $multicast->multicast_id = $response->multicast_id;
-      $multicast->notification = $msg;
+      $multicast->notification = $notification;
+      if ($hasData) { $multicast->data = $data; }
       fcm_multicast_save($multicast);
     }
 
@@ -229,7 +232,11 @@ function fcm_message_send($msg, $userTokens) {
 
   }
 
-  return $response;
+  // Return the response and multicast bundles as a result.
+  return [
+    'response' => $response,
+    'multicast' => $multicast
+  ];
 
 }
 
