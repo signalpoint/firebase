@@ -107,6 +107,13 @@ function fcm_multicast_save(&$data) {
 
 function fcm_message_send($notification, $userTokens, $data = array()) {
 
+  // If the server key hasn't been set, throw an error and return.
+  $serverKey = variable_get('firebase_cloud_messaging_server_key', '');
+  if ($serverKey == '') {
+    drupal_set_message(t('Firebase "Server key" has not been set.'), 'warning');
+    return NULL;
+  }
+
   // Put together a collection of internal token ids and actual Firebase tokens.
   $tokenIds = [];
   $tokens = [];
@@ -115,6 +122,7 @@ function fcm_message_send($notification, $userTokens, $data = array()) {
     $tokens[] = $tokenData->token;
   }
 //  dpm($tokenIds);
+//  dpm('tokens');
 //  dpm($tokens);
 
   // Any extra data?
@@ -122,16 +130,21 @@ function fcm_message_send($notification, $userTokens, $data = array()) {
 
   // Set up the fields to POST.
   $fields = array(
-    'registration_ids' => $tokens,
     'notification' => $notification
   );
+
+  // If there is only a single token use it alongside "to" as the field,
+  // otherwise use "registration_ids" along with an array of tokens. Without
+  // this we seem to get hit with the InvalidRegistration error from Firebase
+  // for a single iOS token: @see https://stackoverflow.com/a/49765050/763010
+  if (sizeof($tokens) == 1) { $fields['to'] = $tokens[0]; }
+  else { $fields['registration_ids'] = $tokens; }
+
+  // If there is any incoming data, attach it to the fields.
   if ($hasData) { $fields['data'] = $data; }
 
-  $serverKey = variable_get('firebase_cloud_messaging_server_key', '');
-  if ($serverKey == '') {
-    drupal_set_message(t('Firebase "Server key" has not been set.'), 'warning');
-    return NULL;
-  }
+//  dpm('fields');
+//  dpm($fields);
 
   // Set up the headers.
   $headers = array(
@@ -149,7 +162,9 @@ function fcm_message_send($notification, $userTokens, $data = array()) {
   curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($fields));
   $response = json_decode(curl_exec($ch));
   curl_close($ch);
+//  dpm('response');
 //  dpm($response);
+//  drupal_set_message('<pre>' . print_r($response, TRUE) . '</pre>');
 
   // If we have a response with success and results, assemble our multicast from
   // the FCM response.
