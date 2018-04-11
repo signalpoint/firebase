@@ -48,7 +48,6 @@ function firebase_cloud_messaging_send_form_submit($form, &$form_state) {
     $uid = explode(',', $uid);
   }
   $userTokens = fcm_user_tokens_load($uid);
-//  dpm($userTokens);
   if (!$userTokens) {
     drupal_set_message(t('No tokens found for user @uid.', array(
       '@uid' => print_r($uid, TRUE)
@@ -56,19 +55,14 @@ function firebase_cloud_messaging_send_form_submit($form, &$form_state) {
     return;
   }
 
-  // Load the token from its id.
-//  $tokenData = fcm_token_load($form_state['values']['id']);
-//  if (!$tokenData) {
-//    drupal_set_message(t('Failed to send message'), 'error');
-//    return;
-//  }
-
   // Build the notification.
   $msg = array(
     'title' => $form_state['values']['title'],
     'body' => $form_state['values']['body']
   );
 
-  $response = fcm_message_send($msg, $userTokens);
+  $result = fcm_message_send($msg, $userTokens);
+
+  // @TODO copy drupal_set_messages() from README to here.
 
 }
