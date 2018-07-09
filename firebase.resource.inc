@@ -7,9 +7,8 @@ function _firebase_resource_access($op, $args) {
     return services_error(t('Authentication is required to use Firebase.'), 403);
   }
 
-  // @TODO this needs better access checking, i.e. people who can't administer
-  // firebase should not be able to work with any tokens or messages they do not
-  // own.
+  // Firebase admin always have access.
+  if (user_access('administer firebase')) { return TRUE; }
 
   global $user;
 
@@ -57,6 +56,21 @@ function _firebase_resource_access($op, $args) {
           break;
 
       }
+
+      break;
+
+    case 'delete fcm token':
+
+      // First make sure they have permission from Drupal, then make sure they
+      // are the owner of the token.
+      if (user_access($op)) {
+        $id = $args[0];
+        $tokenData = fcm_token_load($id);
+        if ($tokenData->uid == $user->uid) {
+          return TRUE;
+        }
+      }
+      return FALSE;
 
       break;
 
