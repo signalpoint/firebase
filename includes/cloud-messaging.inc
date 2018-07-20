@@ -114,6 +114,12 @@ function fcm_message_send($notification, $userTokens, $data = array()) {
     return NULL;
   }
 
+  // If no tokens were included, return.
+  if (empty($userTokens)) {
+    watchdog('fcm', 'No user tokens provided for fcm_message_send().');
+    return NULL;
+  }
+
   // Put together a collection of internal token ids and actual Firebase tokens.
   $tokenIds = [];
   $tokens = [];
@@ -128,10 +134,24 @@ function fcm_message_send($notification, $userTokens, $data = array()) {
   // Any extra data?
   $hasData = !empty($data);
 
-  // Set up the fields to POST.
-  $fields = array(
-    'notification' => $notification
-  );
+  // The click_action property seems to cause issues for Android, so we remove
+  // it. We may have been using it wrong, so we're open to ideas here. But from
+  // what we can tell, click_action is only used for web apps so the browser
+  // knows where to go if the user clicks the notification when it pops up.
+  // If you need a click_action, instead use platform specific requests:
+  // @see https://firebase.google.com/docs/cloud-messaging/concept-options#customizing_a_message_across_platforms
+  if (isset($notification['click_action'])) {
+    watchdog('firebase', 'Removing click_action from $notification', NULL, WATCHDOG_WARNING);
+    unset($notification['click_action']);
+  }
+
+  // Set up the fields to POST. This includes the notification, and if it's not
+  // empty, the data.
+  $fields = array('notification' => $notification);
+  if ($hasData) { $fields['data'] = $data; }
+
+  // DEBUG - prior to tokens being attached (for readability)
+//  watchdog('fcm', 'fcm_message_send()<pre>' . print_r($fields, TRUE) . '</pre>');
 
   // If there is only a single token use it alongside "to" as the field,
   // otherwise use "registration_ids" along with an array of tokens. Without
@@ -139,9 +159,6 @@ function fcm_message_send($notification, $userTokens, $data = array()) {
   // for a single iOS token: @see https://stackoverflow.com/a/49765050/763010
   if (sizeof($tokens) == 1) { $fields['to'] = $tokens[0]; }
   else { $fields['registration_ids'] = $tokens; }
-
-  // If there is any incoming data, attach it to the fields.
-  if ($hasData) { $fields['data'] = $data; }
 
 //  dpm('fields');
 //  dpm($fields);
@@ -217,9 +234,7 @@ function fcm_message_send($notification, $userTokens, $data = array()) {
         if (!in_array($recipientUid, $recipientUserIds)) {
           $recipientUserIds[] = $recipientUid;
         }
-
       }
-
     }
 
     // We've gone over each message and have what we need to proceed...
