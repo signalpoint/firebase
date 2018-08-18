@@ -29,7 +29,7 @@ function fcm_token_save(&$data) {
       ->range(0, 1)
       ->execute();
     $result = $query->fetchObject();
-    if ($result->id) {
+    if ($result && $result->id) {
       return $result;
     }
   }
@@ -177,6 +177,10 @@ function fcm_message_send($notification, $userTokens, $data = array()) {
   curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
   curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
   curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($fields));
+//  watchdog('firebase', 'sending... <pre>' . print_r([
+//    'headers' => $headers,
+//    'fields' => $fields
+//  ], TRUE) . '</pre>');
   $response = json_decode(curl_exec($ch));
   curl_close($ch);
 //  dpm('response');
