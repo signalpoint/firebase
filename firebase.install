@@ -123,8 +123,22 @@ function firebase_schema() {
         'not null' => TRUE,
       )
     ),
-    'primary key' => array('mid')
+    'primary key' => array('mid'),
+    'indexes' => array(
+      'fcm_messages_uid_index' => array('uid'),
+    ),
   );
 
   return $schema;
+}
+
+/**
+ * Add uid index to firebase_cloud_messaging_messages table.
+ */
+function firebase_update_7001() {
+  $table_name = 'firebase_cloud_messaging_messages';
+  $index_name = 'fcm_messages_uid_index';
+  if (!db_index_exists($table_name, $index_name)) {
+    db_add_index($table_name, $index_name, array('uid'));
+  }
 }
