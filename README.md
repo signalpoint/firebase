@@ -10,7 +10,7 @@ composer require google/auth
 
 Set up a Google Service Account that has a Role for Firebase Admin SDK.
 
-Set up and download .json key and enter it file path on this module's configuration form.
+Set up and download a .json credentials key and enter it file path on this module's configuration form.
 
 # Send a message
 
