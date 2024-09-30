@@ -107,32 +107,27 @@ function fcm_multicast_save(&$data) {
 
 function fcm_message_send($notification, $userTokens, $data = array()) {
 
-  // If the server key hasn't been set, throw an error and return.
-  $serverKey = variable_get('firebase_cloud_messaging_server_key', '');
-  if ($serverKey == '') {
-    drupal_set_message(t('Firebase "Server key" has not been set.'), 'warning');
+  // If everything is not OK, stop.
+  if (!firebase_cloud_messaging_ok(TRUE)) {
     return NULL;
   }
 
-  // If no tokens were included, return.
-  if (empty($userTokens)) {
-    watchdog('fcm', 'No user tokens provided for fcm_message_send().');
-    return NULL;
-  }
-
-  // Put together a collection of internal token ids and actual Firebase tokens.
-  $tokenIds = [];
-  $tokens = [];
-  foreach ($userTokens as $tokenId => $tokenData) {
-    $tokenIds[] = $tokenData->id;
-    $tokens[] = $tokenData->token;
-  }
+//  // Put together a collection of internal token ids and actual Firebase tokens.
+//  $tokenIds = [];
+//  $tokens = [];
+//  foreach ($userTokens as $tokenId => $tokenData) {
+//    $tokenIds[] = $tokenData->id;
+//    $tokens[] = $tokenData->token;
+//  }
 //  dpm($tokenIds);
 //  dpm('tokens');
 //  dpm($tokens);
 
   // Any extra data?
   $hasData = !empty($data);
+
+  // TODO
+  // - update "click_action" usage for v1
 
   // The click_action property seems to cause issues for Android, so we remove
   // it. We may have been using it wrong, so we're open to ideas here. But from
@@ -151,23 +146,142 @@ function fcm_message_send($notification, $userTokens, $data = array()) {
   if ($hasData) { $fields['data'] = $data; }
 
   // DEBUG - prior to tokens being attached (for readability)
-//  watchdog('fcm', 'fcm_message_send()<pre>' . print_r($fields, TRUE) . '</pre>');
+//  watchdog('firebase', 'fcm_message_send()<pre>' . print_r($fields, TRUE) . '</pre>');
 
-  // If there is only a single token use it alongside "to" as the field,
-  // otherwise use "registration_ids" along with an array of tokens. Without
-  // this we seem to get hit with the InvalidRegistration error from Firebase
-  // for a single iOS token: @see https://stackoverflow.com/a/49765050/763010
-  if (sizeof($tokens) == 1) { $fields['to'] = $tokens[0]; }
-  else { $fields['registration_ids'] = $tokens; }
+//  // If there is only a single token use it alongside "to" as the field,
+//  // otherwise use "registration_ids" along with an array of tokens. Without
+//  // this we seem to get hit with the InvalidRegistration error from Firebase
+//  // for a single iOS token: @see https://stackoverflow.com/a/49765050/763010
+//  if (sizeof($tokens) == 1) { $fields['to'] = $tokens[0]; }
+//  else { $fields['registration_ids'] = $tokens; }
 
 //  dpm('fields');
 //  dpm($fields);
 
+  // Build the payload...
+  // - with a message and notification (title, body)
+  // - encode any extra message data for the client
+  $payload = [
+    'message' => [
+//      'topic' => 'news', // Is this even needed? Nope, because you can't use this alongside a device token!
+      'notification' => $notification,
+    ],
+  ];
+  if ($hasData) {
+    foreach ($data as $name => $item) {
+      if (is_array($item) || is_object($item)) {
+        $payload['message']['data'][$name] = json_encode($item);
+      }
+      else {
+        $payload['message']['data'][$name] = $item;
+      }
+    }
+  }
+
+  // Get bearer token.
+  $bearerToken = firebase_cloud_messaging_get_bearer_token();
+
   // Set up the headers.
-  $headers = array(
-    'Authorization: key=' . $serverKey,
-    'Content-Type: application/json'
-  );
+  $headers = [
+    'Authorization: Bearer ' . $bearerToken,
+    'Content-Type: application/json',
+  ];
+
+//  foreach ($tokens as $token) {
+
+  foreach ($userTokens as $tokenId => $tokenData) {
+
+    $token = $tokenData->token;
+
+    // Set the device token onto the message.
+    $payload['message']['token'] = $token;
+
+    // Send everything to Firebase via CURL...
+
+    $fcmProjectId = variable_get('firebase_cloud_messaging_project_id');
+    $fcmUrl = "https://fcm.googleapis.com/v1/projects/{$fcmProjectId}/messages:send";
+
+    $ch = curl_init();
+    curl_setopt($ch, CURLOPT_URL, $fcmUrl);
+    curl_setopt($ch, CURLOPT_POST, TRUE);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, TRUE);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, FALSE);
+    curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload));
+
+//    watchdog('firebase', 'sending... <pre>' . print_r([
+//      'headers' => $headers,
+//      'fields' => $payload,
+//    ], TRUE) . '</pre>');
+
+    $response = json_decode(curl_exec($ch));
+    curl_close($ch);
+
+    drupal_set_message('<pre>' . print_r($response, TRUE) . '</pre>');
+
+    // Handle any errors
+
+    if (isset($response->error)) {
+
+      $error = $response->error;
+
+      if ($error->code == 404) {
+
+        if (
+          isset($error->details[0]->errorCode) &&
+          (
+            $error->details[0]->errorCode == 'UNREGISTERED' || // token expired
+            $error->details[0]->errorCode == 'NOT_FOUND' // user uninstalled app
+          )
+        ) {
+
+          // TODO
+          // - delete the token
+
+          drupal_set_message('TODO delete the token...');
+//          fcm_token_delete($tokenData->id);
+
+        }
+        else {
+
+          // It's an error we aren't handling, log it...
+
+          watchdog('firebase', '!code !status !message', [
+            '!code' => $error->code,
+            '!status' => $error->status,
+            '!message' => $error->message,
+          ], WATCHDOG_ERROR);
+
+        }
+
+      }
+
+      continue; // Move onto the next token
+
+    }
+
+    // Everything was OK...
+
+    // TODO
+    // - handle the successful response
+
+  }
+
+  // TODO
+  // - return multicast and response?
+
+  $multicast = NULL;
+
+  // Return the response and multicast bundles as a result.
+  return [
+    'response' => $response,
+    'multicast' => $multicast,
+  ];
+
+
+
+
+
 
   // Send everything to Firebase via CURL.
   $ch = curl_init();
