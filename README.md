@@ -2,6 +2,16 @@
 
 The Firebase module for Drupal 7.
 
+Add the Google Auth PHP library:
+
+```
+composer require google/auth
+```
+
+Set up a Google Service Account that has a Role for Firebase Admin SDK.
+
+Set up and download .json key and enter it file path on this module's configuration form.
+
 # Send a message
 
 When you'd like to send a message, add code like this to your custom Drupal module:
