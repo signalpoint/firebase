@@ -217,7 +217,7 @@ function fcm_message_send($notification, $userTokens, $data = array()) {
     $response = json_decode(curl_exec($ch));
     curl_close($ch);
 
-    drupal_set_message('<pre>' . print_r($response, TRUE) . '</pre>');
+//    drupal_set_message('<pre>' . print_r($response, TRUE) . '</pre>');
 
     // Handle any errors
 
@@ -262,10 +262,19 @@ function fcm_message_send($notification, $userTokens, $data = array()) {
 
     // Everything was OK...
 
-    // TODO
-    // - handle the successful response
+    if (isset($response->name)) {
+
+      // TODO
+      // - handle the successful response
+
+      // e.g. name = projects/[project-id]/messages/[message-id]
+      // - [name] => projects/foo-bar/messages/0:123456789%987654321
+
+    }
 
   }
+
+  return NULL; // Just return NULL until we figure out how to handle the response.
 
   // TODO
   // - return multicast and response?
