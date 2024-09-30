@@ -54,7 +54,7 @@ function firebase_menu() {
   $items = array();
   $items['admin/config/services/firebase'] = array(
     'title' => 'Firebase',
-    'description' => 'Configuration for the Firebase module',
+    'description' => 'Configuration - Firebase',
     'page callback' => 'drupal_get_form',
     'page arguments' => array('firebase_config_form'),
     'access arguments' => array('administer firebase'),
@@ -62,7 +62,7 @@ function firebase_menu() {
     'file' => 'forms/form.config.inc'
   );
   $items['admin/config/services/firebase/cloud-messaging/send'] = array(
-    'title' => 'Firebase Cloud Messaging Send',
+    'title' => 'Send - Firebase Cloud Messaging',
     'description' => 'Send a message with Firebase Cloud Messaging',
     'page callback' => 'drupal_get_form',
     'page arguments' => array('firebase_cloud_messaging_send_form'),
@@ -118,4 +118,67 @@ function firebase_message_status_valid($status) {
     FIREBASE_MESSAGE_STATUS_UNREAD,
     FIREBASE_MESSAGE_STATUS_READ
   ));
+}
+
+
+function firebase_cloud_messaging_ok($watchdog = FALSE) {
+
+  $problems = [];
+
+  // sender id
+  if (variable_get('firebase_cloud_messaging_sender_id', '') == '') {
+    $problems[] = t('You must set the sender id to send a message.');
+  }
+
+  // project id
+  if (variable_get('firebase_cloud_messaging_project_id', '') == '') {
+    $problems[] = t('You must set the project id to send a message.');
+  }
+
+  // private key path
+  // - make sure it has been set
+  // - make sure the file exists
+  // - set its environment var
+  $privateKeyPath = variable_get('firebase_cloud_messaging_private_key_path', '');
+  if ($privateKeyPath == '') {
+    $problems[] = t('You must set the path to your private key json file.');
+  }
+  else if (!file_exists($privateKeyPath)) {
+    $problems[] = t("The file !file does not exist or cannot be accessed.", [
+      '!file' => $privateKeyPath,
+    ]);
+  }
+  else { putenv('GOOGLE_APPLICATION_CREDENTIALS=' . $privateKeyPath); }
+
+  // If there were any problems, warn via watchdog or message.
+  if (count($problems)) {
+    foreach ($problems as $problem) {
+      $watchdog ?
+        watchdog('firebase', $problem, NULL, WATCHDOG_WARNING) :
+        drupal_set_message($problem, 'warning');
+    }
+    return FALSE;
+  }
+
+  return TRUE;
+
+}
+
+function firebase_cloud_messaging_scopes() {
+
+  // @see https://developers.google.com/identity/protocols/oauth2/scopes
+
+  return [
+    'https://www.googleapis.com/auth/firebase.messaging',
+  ];
+
+}
+
+function firebase_cloud_messaging_bearer_token_cache_key() {
+  return 'firebaseBearer';
+}
+
+function firebase_cloud_messaging_get_bearer_token($reset = FALSE) {
+  module_load_include('inc', 'firebase', 'includes/http-v1');
+  return _firebase_cloud_messaging_get_bearer_token($reset);
 }
