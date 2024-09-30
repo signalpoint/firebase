@@ -1,10 +1,45 @@
 <?php
 
 function firebase_cloud_messaging_send_form($form, $form_state) {
-  if (!variable_get('firebase_cloud_messaging_server_key')) {
-    drupal_set_message(t('You must set the server key to send a message.'), 'warning');
+
+  // settings link
+  $form['#prefix'] = l('Settings', 'admin/config/services/firebase', [
+    'query' => drupal_get_destination(),
+  ]);
+
+  if (!firebase_cloud_messaging_ok()) {
     return $form;
   }
+
+//  // BEGIN: GOOGLE DRIVE TEST
+//
+//  $scopes = [
+//    'https://www.googleapis.com/auth/drive.readonly',
+//  ];
+//
+//  $bearerToken = firebase_cloud_messaging_get_bearer_token();
+//
+//  cwDsm("Bearer Token: " . $bearerToken);
+//
+//  // create middleware
+//  $middleware = ApplicationDefaultCredentials::getMiddleware($scopes);
+//  $stack = HandlerStack::create();
+//  $stack->push($middleware);
+//
+//  // create the HTTP client
+//  $client = new Client([
+//    'handler' => $stack,
+//    'base_uri' => 'https://www.googleapis.com',
+//    'auth' => 'google_auth'  // authorize all requests
+//  ]);
+//
+//  // make the request
+//  $response = $client->get('drive/v2/files');
+//  cwDsm($response->getBody());
+//
+//  // END: GOOGLE DRIVE TEST
+
+  // fieldset
   $form['message'] = array(
     '#type' => 'fieldset',
     '#title' => t('Message'),
@@ -12,12 +47,14 @@ function firebase_cloud_messaging_send_form($form, $form_state) {
     '#collapsed' => FALSE
   );
 
+  // user id
   $form['message']['uid'] = array(
     '#type' => 'textfield',
     '#title' => t('User ID(s)'),
-    '#required' => TRUE
+    '#required' => TRUE,
   );
 
+  // title
   $form['message']['title'] = array(
     '#type' => 'textfield',
     '#title' => t('Title'),
@@ -25,6 +62,7 @@ function firebase_cloud_messaging_send_form($form, $form_state) {
     '#default_value' => 'Hello world'
   );
 
+  // body
   $form['message']['body'] = array(
     '#type' => 'textarea',
     '#title' => t('Body'),
@@ -32,12 +70,14 @@ function firebase_cloud_messaging_send_form($form, $form_state) {
     '#default_value' => 'How are you?'
   );
 
+  // submit
   $form['submit'] = array(
     '#type' => 'submit',
     '#value' => 'Send',
   );
 
   return $form;
+
 }
 
 function firebase_cloud_messaging_send_form_submit($form, &$form_state) {
