@@ -4,8 +4,9 @@ function firebase_uninstall() {
 
   // Delete all of our variables.
   $vars = array(
-    'firebase_cloud_messaging_server_key',
-    'firebase_cloud_messaging_sender_id'
+    'firebase_cloud_messaging_sender_id',
+    'firebase_cloud_messaging_project_id',
+    'firebase_cloud_messaging_private_key_path',
   );
   foreach ($vars as $name) { variable_del($name); }
 
@@ -141,4 +142,11 @@ function firebase_update_7001() {
   if (!db_index_exists($table_name, $index_name)) {
     db_add_index($table_name, $index_name, array('uid'));
   }
+}
+
+/**
+ * Delete deprecated firebase_cloud_messaging_server_key variable.
+ */
+function firebase_update_7002() {
+  variable_del('firebase_cloud_messaging_server_key');
 }
