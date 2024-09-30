@@ -16,6 +16,7 @@ function firebase_config_form($form, &$form_state) {
   ];
 
   // sender id
+  // TODO appears to have been renamed to "project number" in google
   $form['firebase_cloud_messaging']['firebase_cloud_messaging_sender_id'] = [
     '#type' => 'textfield',
     '#title' => t('Sender ID'),
