@@ -219,7 +219,7 @@ function fcm_message_send($notification, $userTokens, $data = array()) {
 
 //    drupal_set_message('<pre>' . print_r($response, TRUE) . '</pre>');
 
-    // Handle any errors
+    // Handle any errors...
 
     if (isset($response->error)) {
 
@@ -235,11 +235,8 @@ function fcm_message_send($notification, $userTokens, $data = array()) {
           )
         ) {
 
-          // TODO
-          // - delete the token
-
-          drupal_set_message('TODO delete the token...');
-//          fcm_token_delete($tokenData->id);
+          // Delete the token.
+          fcm_token_delete($tokenData->id);
 
         }
         else {
