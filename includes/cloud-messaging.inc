@@ -30,7 +30,20 @@ function fcm_token_save(&$data) {
       ->execute();
     $result = $query->fetchObject();
     if ($result && $result->id) {
+
+      // If the token is being used by a different user (e.g. same device using 2x accounts),
+      // then give ownership of the token to the new user.
+      if ($result->uid != $data->uid) {
+        $query = db_update('firebase_cloud_messaging_tokens')
+          ->fields([ 'uid' => $data->uid ])
+          ->condition('id', $result->id)
+          ->execute();
+        $result->uid = $data->uid;
+      }
+
       return $result;
+
+
     }
   }
 
@@ -50,7 +63,7 @@ function fcm_token_delete($id) {
  */
 function fcm_user_tokens_load($uid) {
   $query = db_select('firebase_cloud_messaging_tokens', 't')
-    ->fields('t', array('id', 'uid', 'token'));
+    ->fields('t', array('id', 'uid', 'token', 'platform'));
   $query->condition('t.uid', $uid, is_array($uid) ? 'IN' : '=');
 
   $results = $query->execute();
@@ -140,43 +153,9 @@ function fcm_message_send($notification, $userTokens, $data = array()) {
     unset($notification['click_action']);
   }
 
-  // Set up the fields to POST. This includes the notification, and if it's not
-  // empty, the data.
-  $fields = array('notification' => $notification);
-  if ($hasData) { $fields['data'] = $data; }
-
-  // DEBUG - prior to tokens being attached (for readability)
-//  watchdog('firebase', 'fcm_message_send()<pre>' . print_r($fields, TRUE) . '</pre>');
-
-//  // If there is only a single token use it alongside "to" as the field,
-//  // otherwise use "registration_ids" along with an array of tokens. Without
-//  // this we seem to get hit with the InvalidRegistration error from Firebase
-//  // for a single iOS token: @see https://stackoverflow.com/a/49765050/763010
-//  if (sizeof($tokens) == 1) { $fields['to'] = $tokens[0]; }
-//  else { $fields['registration_ids'] = $tokens; }
-
-//  dpm('fields');
-//  dpm($fields);
-
   // Build the payload...
   // - with a message and notification (title, body)
   // - encode any extra message data for the client
-  $payload = [
-    'message' => [
-//      'topic' => 'news', // Is this even needed? Nope, because you can't use this alongside a device token!
-      'notification' => $notification,
-    ],
-  ];
-  if ($hasData) {
-    foreach ($data as $name => $item) {
-      if (is_array($item) || is_object($item)) {
-        $payload['message']['data'][$name] = json_encode($item);
-      }
-      else {
-        $payload['message']['data'][$name] = $item;
-      }
-    }
-  }
 
   // Get bearer token.
   $bearerToken = firebase_cloud_messaging_get_bearer_token();
@@ -187,11 +166,55 @@ function fcm_message_send($notification, $userTokens, $data = array()) {
     'Content-Type: application/json',
   ];
 
-//  foreach ($tokens as $token) {
-
   foreach ($userTokens as $tokenId => $tokenData) {
 
     $token = $tokenData->token;
+    $platform = $tokenData->platform;
+    $payload = NULL;
+
+    switch ($platform) {
+
+      // ANDROID
+      case 'android':
+        $payload = [
+          'message' => [
+            'notification' => [
+              'title' => $notification['title'],
+              'body' => $notification['body'],
+            ],
+            'android' => [ // TODO this might not be needed
+              'notification' => [
+                'click_action' => 'com.adobe.phonegap.push.background.MESSAGING_EVENT',
+              ],
+            ],
+          ],
+        ];
+        break;
+
+      // IOS
+      case 'ios':
+        $payload = [
+          'message' => [
+            'notification' => $notification,
+          ],
+        ];
+        break;
+
+      // WEB
+//      case 'web':
+//        break;
+
+    }
+    if (!$payload) { continue; } // Skip to next token if no payload was assembled.
+
+    // Set any custom data onto the message payload.
+    if ($hasData) {
+      foreach ($data as $name => $item) {
+        $payload['message']['data'][$name] = is_array($item) || is_object($item)
+          ? json_encode($item)
+          : $item;
+      }
+    }
 
     // Set the device token onto the message.
     $payload['message']['token'] = $token;
@@ -214,8 +237,20 @@ function fcm_message_send($notification, $userTokens, $data = array()) {
 //      'fields' => $payload,
 //    ], TRUE) . '</pre>');
 
+//    cwDsm($platform);
+//    cwDsm($payload);
+
+//    cwWatchdog($platform);
+//    cwWatchdog($payload);
+
     $response = json_decode(curl_exec($ch));
     curl_close($ch);
+
+//    cwDsm($response);
+//    cwDsm('------------------');
+
+//    cwWatchdog($response);
+//    cwWatchdog('------------------');
 
 //    drupal_set_message('<pre>' . print_r($response, TRUE) . '</pre>');
 
@@ -239,17 +274,17 @@ function fcm_message_send($notification, $userTokens, $data = array()) {
           fcm_token_delete($tokenData->id);
 
         }
-        else {
 
-          // It's an error we aren't handling, log it...
+      }
+      else {
 
-          watchdog('firebase', '!code !status !message', [
-            '!code' => $error->code,
-            '!status' => $error->status,
-            '!message' => $error->message,
-          ], WATCHDOG_ERROR);
+        // It's an error we aren't handling, log it...
 
-        }
+        watchdog('firebase', '!code !status !message', [
+          '!code' => $error->code,
+          '!status' => $error->status,
+          '!message' => $error->message,
+        ], WATCHDOG_ERROR);
 
       }
 
@@ -288,6 +323,25 @@ function fcm_message_send($notification, $userTokens, $data = array()) {
 
 
 
+
+  // Set up the fields to POST. This includes the notification, and if it's not
+  // empty, the data.
+  $fields = array('notification' => $notification);
+  if ($hasData) { $fields['data'] = $data; }
+
+  // DEBUG - prior to tokens being attached (for readability)
+//  cwWatchdog('fcm_message_send()', 'firebase');
+//  cwWatchdog($fields, 'firebase');
+
+//  // If there is only a single token use it alongside "to" as the field,
+//  // otherwise use "registration_ids" along with an array of tokens. Without
+//  // this we seem to get hit with the InvalidRegistration error from Firebase
+//  // for a single iOS token: @see https://stackoverflow.com/a/49765050/763010
+//  if (sizeof($tokens) == 1) { $fields['to'] = $tokens[0]; }
+//  else { $fields['registration_ids'] = $tokens; }
+
+//  dpm('fields');
+//  dpm($fields);
 
   // Send everything to Firebase via CURL.
   $ch = curl_init();
