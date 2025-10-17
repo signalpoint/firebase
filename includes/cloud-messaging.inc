@@ -196,6 +196,13 @@ function fcm_message_send($notification, $userTokens, $data = array()) {
         $payload = [
           'message' => [
             'notification' => $notification,
+            'apns' => [
+              'payload' => [
+                'aps' => [
+                  'sound' => 'default',
+                ],
+              ],
+            ],
           ],
         ];
         break;
